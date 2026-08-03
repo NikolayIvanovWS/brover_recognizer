@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-import glob
 import re
 import select
 import sys
@@ -43,7 +42,7 @@ class DatasetCollector(Node):
             f'Сбор датасета запущен. Топик камеры: {IMAGE_TOPIC}'
         )
         self.get_logger().info(f'Папка данных: {DATA_DIR}')
-        self.print_help()
+        self.print_controls()
 
     def _read_classes(self):
         classes = list(self.get_parameter('classes').value)
@@ -85,12 +84,11 @@ class DatasetCollector(Node):
 
         self.current_image = image
 
-    def print_help(self):
+    def print_controls(self):
         print()
         print('Управление сбором датасета:')
         for index, class_name in enumerate(self.classes, start=1):
             print(f'  [{index}] сохранить изображение в {class_name}')
-        print('  [h] показать подсказку')
         print('  [q] выйти')
         print()
         sys.stdout.flush()
@@ -118,12 +116,11 @@ class DatasetCollector(Node):
 
     @staticmethod
     def _next_index(class_dir, class_name):
-        pattern = str(class_dir / f'{class_name}_*.jpg')
         max_index = 0
         regexp = re.compile(rf'^{re.escape(class_name)}_(\d+)\.jpg$')
 
-        for path in glob.glob(pattern):
-            match = regexp.match(Path(path).name)
+        for path in class_dir.glob(f'{class_name}_*.jpg'):
+            match = regexp.match(path.name)
             if not match:
                 continue
             max_index = max(max_index, int(match.group(1)))
@@ -174,9 +171,6 @@ def main(args=None):
                 if key == 'q':
                     node.get_logger().info('Сбор датасета завершен пользователем')
                     break
-                if key == 'h':
-                    node.print_help()
-                    continue
                 if key.isdigit():
                     index = int(key) - 1
                     if 0 <= index < len(node.classes):
