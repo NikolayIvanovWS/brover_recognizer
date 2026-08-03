@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import cv2
 from cv_bridge import CvBridge
 import rclpy
 from rclpy.node import Node
@@ -11,7 +10,6 @@ from std_msgs.msg import String
 
 
 IMAGE_TOPIC = '/camera1/image_raw'
-ANNOTATED_IMAGE_TOPIC = '/brover_recognizer/annotated_image'
 RESULT_TOPIC = '/brover_recognizer/result'
 DATA_DIR = Path.home() / 'brover_recognizer_data'
 MODEL_PATH = DATA_DIR / 'models' / 'best.pt'
@@ -38,16 +36,10 @@ class ObjectRecognizer(Node):
             self.image_callback,
             10,
         )
-        self.annotated_image_publisher = self.create_publisher(
-            Image,
-            ANNOTATED_IMAGE_TOPIC,
-            10,
-        )
         self.result_publisher = self.create_publisher(String, RESULT_TOPIC, 10)
         self.create_timer(INFERENCE_PERIOD, self.recognize_latest_image)
 
         self.get_logger().info(f'Распознавание запущено. Топик камеры: {IMAGE_TOPIC}')
-        self.get_logger().info(f'Топик видео с подписью: {ANNOTATED_IMAGE_TOPIC}')
         self.get_logger().info(f'Топик результата: {RESULT_TOPIC}')
 
     def _read_classes(self):
@@ -91,11 +83,9 @@ class ObjectRecognizer(Node):
         if self.model is None or self.latest_image is None:
             return
 
-        image = self.latest_image.copy()
-
         try:
             results = self.model.predict(
-                source=image,
+                source=self.latest_image,
                 imgsz=IMAGE_SIZE,
                 device='cpu',
                 verbose=False,
@@ -105,18 +95,9 @@ class ObjectRecognizer(Node):
             return
 
         result = results[0]
-        result_text, is_confirmed = self._format_result(result)
-        annotated_image = self._draw_result(image, result_text, is_confirmed)
+        result_text = self._format_result(result)
 
         self.result_publisher.publish(String(data=result_text))
-        annotated_message = self.bridge.cv2_to_imgmsg(
-            annotated_image,
-            encoding='bgr8',
-        )
-        if self.latest_header is not None:
-            annotated_message.header = self.latest_header
-
-        self.annotated_image_publisher.publish(annotated_message)
 
         if result_text != self.last_logged_result:
             self.get_logger().info(result_text)
@@ -124,7 +105,7 @@ class ObjectRecognizer(Node):
 
     def _format_result(self, result):
         if result.probs is None:
-            return 'Объекты не найдены', False
+            return 'Объекты не найдены'
 
         class_index = int(result.probs.top1)
         confidence = float(result.probs.top1conf)
@@ -132,9 +113,9 @@ class ObjectRecognizer(Node):
         result = f'{class_name}: {confidence:.0%}'
 
         if confidence < CONFIRMED_CONFIDENCE:
-            return 'Ничего не распознано', False
+            return 'Ничего не распознано'
 
-        return f'Найдено: {result}', True
+        return f'Найдено: {result}'
 
     def _class_name(self, class_index):
         model_names = getattr(self.model, 'names', None)
@@ -143,34 +124,6 @@ class ObjectRecognizer(Node):
         if 0 <= class_index < len(self.classes):
             return self.classes[class_index]
         return f'class{class_index}'
-
-    @staticmethod
-    def _draw_result(image, text, is_confirmed):
-        annotated = image.copy()
-        color = (0, 170, 0) if is_confirmed else (80, 80, 80)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        scale = 0.7
-        thickness = 2
-        max_width = max(1, annotated.shape[1] - 24)
-
-        while scale > 0.4:
-            text_width, _ = cv2.getTextSize(text, font, scale, thickness)[0]
-            if text_width <= max_width:
-                break
-            scale -= 0.05
-
-        cv2.rectangle(annotated, (0, 0), (annotated.shape[1], 42), color, -1)
-        cv2.putText(
-            annotated,
-            text,
-            (12, 28),
-            font,
-            scale,
-            (255, 255, 255),
-            thickness,
-            cv2.LINE_AA,
-        )
-        return annotated
 
 
 def main(args=None):
