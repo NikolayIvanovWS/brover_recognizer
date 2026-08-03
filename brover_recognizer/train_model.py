@@ -8,15 +8,15 @@ from rclpy.node import Node
 
 
 DATA_DIR = Path.home() / 'brover_recognizer_data'
-YOLO_DATASET_DIR = DATA_DIR / 'dataset' / 'yolo'
-YOLO_DATA_YAML = YOLO_DATASET_DIR / 'data.yaml'
+CLASSIFY_DATASET_DIR = DATA_DIR / 'dataset' / 'classification'
 MODELS_DIR = DATA_DIR / 'models'
 
-MODEL_NAME = 'yolo26n.pt'
+MODEL_NAME = 'yolo26n-cls.pt'
 IMAGE_SIZE = 320
 EPOCHS = 30
 BATCH_SIZE = 2
 WORKERS = 0
+TRAIN_RUN_NAME = 'classification'
 
 
 class ModelTrainer(Node):
@@ -24,9 +24,9 @@ class ModelTrainer(Node):
         super().__init__('train_model')
 
     def run(self):
-        if not YOLO_DATA_YAML.exists():
+        if not CLASSIFY_DATASET_DIR.exists():
             self.get_logger().error(
-                f'YOLO dataset config not found: {YOLO_DATA_YAML}'
+                f'Classification dataset not found: {CLASSIFY_DATASET_DIR}'
             )
             self.get_logger().error(
                 'Сначала запустите: '
@@ -41,15 +41,14 @@ class ModelTrainer(Node):
                 'Python-пакет ultralytics не установлен.'
             )
             self.get_logger().error(
-                'Для обучения YOLO установите зависимости, например: '
-                'python3 -m pip install --user "ultralytics[export]"'
+                'Установите YOLO-зависимости из инструкции для чистого образа.'
             )
             return
 
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
         self.get_logger().info(f'Модель: {MODEL_NAME}')
-        self.get_logger().info(f'Датасет: {YOLO_DATA_YAML}')
+        self.get_logger().info(f'Датасет: {CLASSIFY_DATASET_DIR}')
         self.get_logger().info(
             'Параметры обучения: '
             f'imgsz={IMAGE_SIZE}, epochs={EPOCHS}, '
@@ -58,14 +57,15 @@ class ModelTrainer(Node):
 
         model = YOLO(MODEL_NAME)
         results = model.train(
-            data=str(YOLO_DATA_YAML),
+            data=str(CLASSIFY_DATASET_DIR),
+            task='classify',
             epochs=EPOCHS,
             imgsz=IMAGE_SIZE,
             batch=BATCH_SIZE,
             workers=WORKERS,
             device='cpu',
             project=str(MODELS_DIR),
-            name='train',
+            name=TRAIN_RUN_NAME,
             exist_ok=True,
         )
 

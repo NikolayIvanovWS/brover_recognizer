@@ -16,9 +16,7 @@ RESULT_TOPIC = '/brover_recognizer/result'
 DATA_DIR = Path.home() / 'brover_recognizer_data'
 MODEL_PATH = DATA_DIR / 'models' / 'best.pt'
 IMAGE_SIZE = 320
-CONFIDENCE = 0.05
-CONFIRMED_CONFIDENCE = 0.25
-MAX_DETECTIONS = 1
+CONFIRMED_CONFIDENCE = 0.65
 INFERENCE_PERIOD = 2.0
 
 
@@ -49,7 +47,7 @@ class ObjectRecognizer(Node):
         self.create_timer(INFERENCE_PERIOD, self.recognize_latest_image)
 
         self.get_logger().info(f'Распознавание запущено. Топик камеры: {IMAGE_TOPIC}')
-        self.get_logger().info(f'Топик видео с рамками: {ANNOTATED_IMAGE_TOPIC}')
+        self.get_logger().info(f'Топик видео с подписью: {ANNOTATED_IMAGE_TOPIC}')
         self.get_logger().info(f'Топик результата: {RESULT_TOPIC}')
 
     def _read_classes(self):
@@ -99,8 +97,6 @@ class ObjectRecognizer(Node):
             results = self.model.predict(
                 source=image,
                 imgsz=IMAGE_SIZE,
-                conf=CONFIDENCE,
-                max_det=MAX_DETECTIONS,
                 device='cpu',
                 verbose=False,
             )
@@ -110,10 +106,7 @@ class ObjectRecognizer(Node):
 
         result = results[0]
         result_text, is_confirmed = self._format_result(result)
-        if is_confirmed:
-            annotated_image = result.plot()
-        else:
-            annotated_image = image
+        annotated_image = self._draw_result(image, result_text, is_confirmed)
 
         self.result_publisher.publish(String(data=result_text))
         annotated_message = self.bridge.cv2_to_imgmsg(
@@ -130,28 +123,54 @@ class ObjectRecognizer(Node):
             self.last_logged_result = result_text
 
     def _format_result(self, result):
-        detections = []
-
-        if result.boxes is not None:
-            for class_id, confidence in zip(
-                result.boxes.cls.tolist(),
-                result.boxes.conf.tolist(),
-            ):
-                class_index = int(class_id)
-                if 0 <= class_index < len(self.classes):
-                    detections.append((self.classes[class_index], confidence))
-
-        if not detections:
+        if result.probs is None:
             return 'Объекты не найдены', False
 
-        detections.sort(key=lambda item: item[1], reverse=True)
-        class_name, confidence = detections[0]
+        class_index = int(result.probs.top1)
+        confidence = float(result.probs.top1conf)
+        class_name = self._class_name(class_index)
         result = f'{class_name}: {confidence:.0%}'
 
         if confidence < CONFIRMED_CONFIDENCE:
             return f'Нет уверенного распознавания (гипотеза: {result})', False
 
         return f'Найдено: {result}', True
+
+    def _class_name(self, class_index):
+        model_names = getattr(self.model, 'names', None)
+        if isinstance(model_names, dict) and class_index in model_names:
+            return str(model_names[class_index])
+        if 0 <= class_index < len(self.classes):
+            return self.classes[class_index]
+        return f'class{class_index}'
+
+    @staticmethod
+    def _draw_result(image, text, is_confirmed):
+        annotated = image.copy()
+        color = (0, 170, 0) if is_confirmed else (80, 80, 80)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.7
+        thickness = 2
+        max_width = max(1, annotated.shape[1] - 24)
+
+        while scale > 0.4:
+            text_width, _ = cv2.getTextSize(text, font, scale, thickness)[0]
+            if text_width <= max_width:
+                break
+            scale -= 0.05
+
+        cv2.rectangle(annotated, (0, 0), (annotated.shape[1], 42), color, -1)
+        cv2.putText(
+            annotated,
+            text,
+            (12, 28),
+            font,
+            scale,
+            (255, 255, 255),
+            thickness,
+            cv2.LINE_AA,
+        )
+        return annotated
 
 
 def main(args=None):
