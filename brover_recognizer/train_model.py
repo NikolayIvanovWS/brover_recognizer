@@ -5,6 +5,7 @@ import shutil
 
 import rclpy
 from rclpy.node import Node
+from ultralytics import YOLO
 
 
 DATA_DIR = Path.home() / 'brover_recognizer_data'
@@ -26,22 +27,11 @@ class ModelTrainer(Node):
     def run(self):
         if not CLASSIFY_DATASET_DIR.exists():
             self.get_logger().error(
-                f'Classification dataset not found: {CLASSIFY_DATASET_DIR}'
+                f'Классификационный датасет не найден: {CLASSIFY_DATASET_DIR}'
             )
             self.get_logger().error(
                 'Сначала запустите: '
                 'ros2 launch brover_recognizer prepare_dataset.launch.py'
-            )
-            return
-
-        try:
-            from ultralytics import YOLO
-        except ImportError:
-            self.get_logger().error(
-                'Python-пакет ultralytics не установлен.'
-            )
-            self.get_logger().error(
-                'Установите YOLO-зависимости из инструкции для чистого образа.'
             )
             return
 

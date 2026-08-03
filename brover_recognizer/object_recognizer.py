@@ -16,6 +16,9 @@ os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
 os.environ.setdefault('MKL_NUM_THREADS', '1')
 os.environ.setdefault('NUMEXPR_NUM_THREADS', '1')
 
+import torch
+from ultralytics import YOLO
+
 IMAGE_TOPIC = '/camera1/image_raw'
 RESULT_TOPIC = '/brover_recognizer/result'
 DATA_DIR = Path.home() / 'brover_recognizer_data'
@@ -59,7 +62,7 @@ class ObjectRecognizer(Node):
         classes = [class_name for class_name in classes if class_name]
 
         if not classes:
-            raise ValueError('Parameter "classes" must contain at least one class')
+            raise ValueError('Параметр "classes" должен содержать хотя бы один класс')
 
         return classes
 
@@ -71,18 +74,8 @@ class ObjectRecognizer(Node):
             )
             return None
 
-        try:
-            from ultralytics import YOLO
-        except ImportError as error:
-            self.get_logger().error(f'Python-пакет ultralytics не установлен: {error}')
-            return None
-
-        try:
-            import torch
-            torch.set_num_threads(1)
-            torch.set_num_interop_threads(1)
-        except Exception as error:
-            self.get_logger().warning(f'Не удалось ограничить потоки PyTorch: {error}')
+        torch.set_num_threads(1)
+        torch.set_num_interop_threads(1)
 
         self.get_logger().info(f'Загрузка модели: {MODEL_PATH}')
         return YOLO(str(MODEL_PATH))

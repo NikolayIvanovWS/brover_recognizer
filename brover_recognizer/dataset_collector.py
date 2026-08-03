@@ -50,17 +50,17 @@ class DatasetCollector(Node):
         classes = [class_name for class_name in classes if class_name]
 
         if not classes:
-            raise ValueError('Parameter "classes" must contain at least one class')
+            raise ValueError('Параметр "classes" должен содержать хотя бы один класс')
 
         if len(classes) > 9:
-            raise ValueError('Dataset collector supports up to 9 keyboard classes')
+            raise ValueError('Сборщик датасета поддерживает до 9 классов с клавиатуры')
 
         duplicates = sorted({
             class_name for class_name in classes
             if classes.count(class_name) > 1
         })
         if duplicates:
-            raise ValueError(f'Duplicate class names: {duplicates}')
+            raise ValueError(f'Повторяющиеся имена классов: {duplicates}')
 
         return classes
 

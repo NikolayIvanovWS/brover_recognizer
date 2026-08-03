@@ -28,7 +28,7 @@ class DatasetPreparer(Node):
     def run(self):
         self.get_logger().info(f'Папка исходных изображений: {self.raw_dir}')
         self.get_logger().info(
-            f'Папка classification-датасета: {self.classify_dir}'
+            f'Папка классификационного датасета: {self.classify_dir}'
         )
 
         class_images = self._collect_images()
@@ -69,14 +69,14 @@ class DatasetPreparer(Node):
         classes = [class_name for class_name in classes if class_name]
 
         if not classes:
-            raise ValueError('Parameter "classes" must contain at least one class')
+            raise ValueError('Параметр "classes" должен содержать хотя бы один класс')
 
         duplicates = sorted({
             class_name for class_name in classes
             if classes.count(class_name) > 1
         })
         if duplicates:
-            raise ValueError(f'Duplicate class names: {duplicates}')
+            raise ValueError(f'Повторяющиеся имена классов: {duplicates}')
 
         return classes
 
