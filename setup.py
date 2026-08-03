@@ -43,6 +43,10 @@ setup(
                 'brover_recognizer.prepare_dataset:main'
             ),
             (
+                'clear_data = '
+                'brover_recognizer.clear_data:main'
+            ),
+            (
                 'train_model = '
                 'brover_recognizer.train_model:main'
             ),
