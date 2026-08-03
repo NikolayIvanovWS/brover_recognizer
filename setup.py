@@ -42,6 +42,10 @@ setup(
                 'prepare_dataset = '
                 'brover_recognizer.prepare_dataset:main'
             ),
+            (
+                'train_model = '
+                'brover_recognizer.train_model:main'
+            ),
         ],
     },
 )
