@@ -16,7 +16,7 @@ RESULT_TOPIC = '/brover_recognizer/result'
 DATA_DIR = Path.home() / 'brover_recognizer_data'
 MODEL_PATH = DATA_DIR / 'models' / 'best.pt'
 IMAGE_SIZE = 320
-CONFIRMED_CONFIDENCE = 0.65
+CONFIRMED_CONFIDENCE = 0.90
 INFERENCE_PERIOD = 2.0
 
 
@@ -132,7 +132,7 @@ class ObjectRecognizer(Node):
         result = f'{class_name}: {confidence:.0%}'
 
         if confidence < CONFIRMED_CONFIDENCE:
-            return f'Нет уверенного распознавания (гипотеза: {result})', False
+            return 'Ничего не распознано', False
 
         return f'Найдено: {result}', True
 
