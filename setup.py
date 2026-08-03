@@ -38,6 +38,10 @@ setup(
                 'dataset_collector = '
                 'brover_recognizer.dataset_collector:main'
             ),
+            (
+                'prepare_dataset = '
+                'brover_recognizer.prepare_dataset:main'
+            ),
         ],
     },
 )
