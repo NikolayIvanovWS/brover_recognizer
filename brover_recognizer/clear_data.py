@@ -10,7 +10,6 @@ from rclpy.node import Node
 DATA_DIR = Path.home() / 'brover_recognizer_data'
 DATASET_DIR = DATA_DIR / 'dataset'
 RAW_DIR = DATASET_DIR / 'raw'
-MODELS_DIR = DATA_DIR / 'models'
 
 
 class DataCleaner(Node):
@@ -23,12 +22,11 @@ class DataCleaner(Node):
     def run(self):
         self.get_logger().info(f'Папка данных: {DATA_DIR}')
 
-        for path in (DATASET_DIR, MODELS_DIR):
-            if path.exists():
-                shutil.rmtree(path)
-                self.get_logger().info(f'Удалено: {path}')
-            else:
-                self.get_logger().info(f'Папка уже отсутствует: {path}')
+        if DATA_DIR.exists():
+            shutil.rmtree(DATA_DIR)
+            self.get_logger().info(f'Удалено: {DATA_DIR}')
+        else:
+            self.get_logger().info(f'Папка уже отсутствует: {DATA_DIR}')
 
         for class_name in self.classes:
             class_dir = RAW_DIR / class_name
