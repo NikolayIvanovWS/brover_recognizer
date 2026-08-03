@@ -16,8 +16,9 @@ RESULT_TOPIC = '/brover_recognizer/result'
 DATA_DIR = Path.home() / 'brover_recognizer_data'
 MODEL_PATH = DATA_DIR / 'models' / 'best.pt'
 IMAGE_SIZE = 320
-CONFIDENCE = 0.4
-INFERENCE_PERIOD = 0.5
+CONFIDENCE = 0.05
+MAX_DETECTIONS = 1
+INFERENCE_PERIOD = 2.0
 
 
 class ObjectRecognizer(Node):
@@ -98,6 +99,7 @@ class ObjectRecognizer(Node):
                 source=image,
                 imgsz=IMAGE_SIZE,
                 conf=CONFIDENCE,
+                max_det=MAX_DETECTIONS,
                 device='cpu',
                 verbose=False,
             )
@@ -124,24 +126,26 @@ class ObjectRecognizer(Node):
             self.last_logged_result = result_text
 
     def _format_result(self, result):
-        counts = {class_name: 0 for class_name in self.classes}
+        detections = []
 
         if result.boxes is not None:
-            for class_id in result.boxes.cls.tolist():
+            for class_id, confidence in zip(
+                result.boxes.cls.tolist(),
+                result.boxes.conf.tolist(),
+            ):
                 class_index = int(class_id)
                 if 0 <= class_index < len(self.classes):
-                    counts[self.classes[class_index]] += 1
+                    detections.append((self.classes[class_index], confidence))
 
-        detected = [
-            f'{class_name}: {count}'
-            for class_name, count in counts.items()
-            if count > 0
-        ]
-
-        if not detected:
+        if not detections:
             return 'Объекты не найдены'
 
-        return '; '.join(detected)
+        detections.sort(key=lambda item: item[1], reverse=True)
+        detected = [
+            f'{class_name}: {confidence:.0%}'
+            for class_name, confidence in detections
+        ]
+        return 'Найдено: ' + '; '.join(detected)
 
 
 def main(args=None):
