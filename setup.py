@@ -46,6 +46,10 @@ setup(
                 'train_model = '
                 'brover_recognizer.train_model:main'
             ),
+            (
+                'object_recognizer = '
+                'brover_recognizer.object_recognizer:main'
+            ),
         ],
     },
 )
