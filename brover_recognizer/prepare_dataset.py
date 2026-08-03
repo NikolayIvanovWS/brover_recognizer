@@ -143,7 +143,7 @@ class DatasetPreparer(Node):
     def _write_data_yaml(self):
         names = ', '.join(f"'{class_name}'" for class_name in self.classes)
         data_yaml = (
-            'path: .\n'
+            f'path: {self.yolo_dir}\n'
             'train: images/train\n'
             'val: images/val\n'
             f'nc: {len(self.classes)}\n'
