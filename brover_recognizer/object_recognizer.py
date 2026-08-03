@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 
+import os
 from pathlib import Path
 
 from cv_bridge import CvBridge
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
+
+os.environ.setdefault('OMP_NUM_THREADS', '1')
+os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
+os.environ.setdefault('MKL_NUM_THREADS', '1')
+os.environ.setdefault('NUMEXPR_NUM_THREADS', '1')
 
 IMAGE_TOPIC = '/camera1/image_raw'
 RESULT_TOPIC = '/brover_recognizer/result'
@@ -25,16 +32,20 @@ class ObjectRecognizer(Node):
         self.declare_parameter('classes', ['classA', 'classB'])
         self.classes = self._read_classes()
         self.bridge = CvBridge()
-        self.latest_image = None
-        self.latest_header = None
+        self.latest_image_message = None
         self.last_logged_result = None
         self.model = self._load_model()
+        image_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+        )
 
         self.create_subscription(
             Image,
             IMAGE_TOPIC,
             self.image_callback,
-            10,
+            image_qos,
         )
         self.result_publisher = self.create_publisher(String, RESULT_TOPIC, 10)
         self.create_timer(INFERENCE_PERIOD, self.recognize_latest_image)
@@ -66,26 +77,35 @@ class ObjectRecognizer(Node):
             self.get_logger().error(f'Python-пакет ultralytics не установлен: {error}')
             return None
 
+        try:
+            import torch
+            torch.set_num_threads(1)
+            torch.set_num_interop_threads(1)
+        except Exception as error:
+            self.get_logger().warning(f'Не удалось ограничить потоки PyTorch: {error}')
+
         self.get_logger().info(f'Загрузка модели: {MODEL_PATH}')
         return YOLO(str(MODEL_PATH))
 
     def image_callback(self, message):
-        try:
-            self.latest_image = self.bridge.imgmsg_to_cv2(
-                message,
-                desired_encoding='bgr8',
-            )
-            self.latest_header = message.header
-        except Exception as error:
-            self.get_logger().warning(f'Не удалось преобразовать изображение: {error}')
+        self.latest_image_message = message
 
     def recognize_latest_image(self):
-        if self.model is None or self.latest_image is None:
+        if self.model is None or self.latest_image_message is None:
+            return
+
+        try:
+            image = self.bridge.imgmsg_to_cv2(
+                self.latest_image_message,
+                desired_encoding='bgr8',
+            )
+        except Exception as error:
+            self.get_logger().warning(f'Не удалось преобразовать изображение: {error}')
             return
 
         try:
             results = self.model.predict(
-                source=self.latest_image,
+                source=image,
                 imgsz=IMAGE_SIZE,
                 device='cpu',
                 verbose=False,
