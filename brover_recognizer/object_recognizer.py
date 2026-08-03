@@ -17,6 +17,7 @@ DATA_DIR = Path.home() / 'brover_recognizer_data'
 MODEL_PATH = DATA_DIR / 'models' / 'best.pt'
 IMAGE_SIZE = 320
 CONFIDENCE = 0.05
+CONFIRMED_CONFIDENCE = 0.25
 MAX_DETECTIONS = 1
 INFERENCE_PERIOD = 2.0
 
@@ -108,8 +109,11 @@ class ObjectRecognizer(Node):
             return
 
         result = results[0]
-        result_text = self._format_result(result)
-        annotated_image = result.plot()
+        result_text, is_confirmed = self._format_result(result)
+        if is_confirmed:
+            annotated_image = result.plot()
+        else:
+            annotated_image = image
 
         self.result_publisher.publish(String(data=result_text))
         annotated_message = self.bridge.cv2_to_imgmsg(
@@ -138,14 +142,16 @@ class ObjectRecognizer(Node):
                     detections.append((self.classes[class_index], confidence))
 
         if not detections:
-            return 'Объекты не найдены'
+            return 'Объекты не найдены', False
 
         detections.sort(key=lambda item: item[1], reverse=True)
-        detected = [
-            f'{class_name}: {confidence:.0%}'
-            for class_name, confidence in detections
-        ]
-        return 'Найдено: ' + '; '.join(detected)
+        class_name, confidence = detections[0]
+        result = f'{class_name}: {confidence:.0%}'
+
+        if confidence < CONFIRMED_CONFIDENCE:
+            return f'Нет уверенного распознавания (гипотеза: {result})', False
+
+        return f'Найдено: {result}', True
 
 
 def main(args=None):
