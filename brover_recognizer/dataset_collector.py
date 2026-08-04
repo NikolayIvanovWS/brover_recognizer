@@ -168,7 +168,7 @@ def main(args=None):
 
                 if key is None:
                     continue
-                if key == 'q':
+                if key in ('q', 'й'):
                     node.get_logger().info('Сбор датасета завершен пользователем')
                     break
                 if key.isdigit():

@@ -21,11 +21,15 @@ from ultralytics import YOLO
 
 IMAGE_TOPIC = '/camera1/image_raw'
 RESULT_TOPIC = '/brover_recognizer/result'
+STATUS_TOPIC = '/brover_recognizer/status'
 DATA_DIR = Path.home() / 'brover_recognizer_data'
 MODEL_PATH = DATA_DIR / 'models' / 'best.pt'
 IMAGE_SIZE = 320
 CONFIRMED_CONFIDENCE = 0.90
 INFERENCE_PERIOD = 2.0
+STATUS_PERIOD = 1.0
+STATUS_READY = 'ready'
+STATUS_ERROR = 'error'
 
 
 class ObjectRecognizer(Node):
@@ -37,6 +41,7 @@ class ObjectRecognizer(Node):
         self.bridge = CvBridge()
         self.latest_image_message = None
         self.last_logged_result = None
+        self.status = STATUS_READY
         self.model = self._load_model()
         image_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -51,10 +56,13 @@ class ObjectRecognizer(Node):
             image_qos,
         )
         self.result_publisher = self.create_publisher(String, RESULT_TOPIC, 10)
+        self.status_publisher = self.create_publisher(String, STATUS_TOPIC, 10)
         self.create_timer(INFERENCE_PERIOD, self.recognize_latest_image)
+        self.create_timer(STATUS_PERIOD, self.publish_status)
 
         self.get_logger().info(f'Распознавание запущено. Топик камеры: {IMAGE_TOPIC}')
         self.get_logger().info(f'Топик результата: {RESULT_TOPIC}')
+        self.get_logger().info(f'Топик состояния: {STATUS_TOPIC}')
 
     def _read_classes(self):
         classes = list(self.get_parameter('classes').value)
@@ -72,6 +80,7 @@ class ObjectRecognizer(Node):
                 f'Модель не найдена: {MODEL_PATH}. '
                 'Сначала запустите train_model.launch.py.'
             )
+            self.status = STATUS_ERROR
             return None
 
         torch.set_num_threads(1)
@@ -94,6 +103,7 @@ class ObjectRecognizer(Node):
             )
         except Exception as error:
             self.get_logger().warning(f'Не удалось преобразовать изображение: {error}')
+            self.status = STATUS_ERROR
             return
 
         try:
@@ -105,16 +115,21 @@ class ObjectRecognizer(Node):
             )
         except Exception as error:
             self.get_logger().error(f'Ошибка распознавания: {error}')
+            self.status = STATUS_ERROR
             return
 
         result = results[0]
         result_text = self._format_result(result)
+        self.status = STATUS_READY
 
         self.result_publisher.publish(String(data=result_text))
 
         if result_text != self.last_logged_result:
             self.get_logger().info(result_text)
             self.last_logged_result = result_text
+
+    def publish_status(self):
+        self.status_publisher.publish(String(data=self.status))
 
     def _format_result(self, result):
         if result.probs is None:
