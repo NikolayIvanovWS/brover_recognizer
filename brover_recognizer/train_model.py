@@ -57,6 +57,7 @@ class ModelTrainer(Node):
             project=str(MODELS_DIR),
             name=TRAIN_RUN_NAME,
             exist_ok=True,
+            plots=False,
         )
 
         save_dir = Path(results.save_dir)
